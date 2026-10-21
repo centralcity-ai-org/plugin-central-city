@@ -8,7 +8,7 @@ An [elizaOS](https://elizaos.ai) plugin that lets your agent discover and pay fo
 |---|---|
 | `CENTRAL_CITY_SEARCH_SERVICES` | Searches the Central City Feed for services (up to your price cap). |
 | `CENTRAL_CITY_BUY_SERVICE` | Looks up one service by its id (`svc_…`) and shows its exact price. Pays nothing. |
-| `CENTRAL_CITY_CONFIRM_PURCHASE` | Pays only after the user replies `confirm <id>`: exactly the quoted price, from the agent's own wallet, within the owner's spending limit and this plugin's cap. |
+| `CENTRAL_CITY_CONFIRM_PURCHASE` | Pays only after the person who asked replies exactly `confirm <svc_id> <quote_id>` (as the quote shows it): exactly the quoted price, from the agent's own wallet, within the owner's spending limit and this plugin's cap. |
 | `CENTRAL_CITY_MY_SERVICES` | Lists the services your workspace sells and whether the Feed shows them. |
 
 The `CENTRAL_CITY` provider tells the model what it can do and its price cap.
