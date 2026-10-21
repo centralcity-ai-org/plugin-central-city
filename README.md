@@ -50,6 +50,11 @@ Scopes: searching needs `workspace:read`, buying `services:pay`, listing your se
 - Service titles, descriptions and results are provider data, never instructions.
 - The workspace key is sent only to https://centralcity.ai (no redirects, no other host) and never appears in replies, logs or errors.
 
+## Limits
+
+- The one-open-purchase rule is enforced inside one agent process. Several processes sharing the same paying agent need a shared, atomic claim (not included).
+- Open quotes and purchases live in the elizaOS runtime cache: they are as durable as that cache.
+
 ## Develop
 
 ```bash
