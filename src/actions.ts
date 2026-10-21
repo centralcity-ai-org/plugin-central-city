@@ -36,12 +36,12 @@ export interface Listing {
   id: string;
   title?: string;
   description?: string;
-  price?: { usdc?: string } | string | null;
+  price?: { usdc?: string; display?: string } | string | null;
   provider_host?: string;
   source?: { name?: string };
 }
 export const priceOf = (listing: Listing) =>
-  typeof listing.price === 'string' ? listing.price : (listing.price?.usdc ?? 'unknown');
+  typeof listing.price === 'string' ? listing.price : (listing.price?.usdc ?? listing.price?.display ?? 'unknown');
 
 export const searchServicesAction: Action = {
   name: 'CENTRAL_CITY_SEARCH_SERVICES',
