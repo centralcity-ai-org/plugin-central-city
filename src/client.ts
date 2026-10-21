@@ -30,11 +30,18 @@ export function createCityClient(options: { workspaceKey: string; url?: string }
     });
     return connected;
   };
+  const scrub = (text: string) => redact(text, options.workspaceKey);
   return {
     async call(tool, args) {
-      const client = await connect();
-      const result = await client.callTool({ name: tool, arguments: args });
-      if (result.isError) throw new CityToolError(tool, textOf(result));
+      let result;
+      try {
+        const client = await connect();
+        result = await client.callTool({ name: tool, arguments: args });
+      } catch (error) {
+        // Transport errors may echo request details: never let the key through.
+        throw new CityToolError(tool, scrub(error instanceof Error ? error.message : String(error)));
+      }
+      if (result.isError) throw new CityToolError(tool, scrub(textOf(result)));
       if ((result as { structuredContent?: unknown }).structuredContent) return (result as { structuredContent?: unknown }).structuredContent;
       const text = textOf(result);
       try {
@@ -44,6 +51,12 @@ export function createCityClient(options: { workspaceKey: string; url?: string }
       }
     },
   };
+}
+
+/** Removes the workspace key and anything shaped like a Central City key or bearer token. */
+export function redact(text: string, key?: string): string {
+  let out = key ? text.split(key).join('[redacted]') : text;
+  return out.replace(/\bccw_[A-Za-z0-9_-]+/g, '[redacted]').replace(/Bearer\s+\S+/gi, 'Bearer [redacted]');
 }
 
 /** The workspace key only ever goes to Central City over https (centralcity.ai or a subdomain). */
