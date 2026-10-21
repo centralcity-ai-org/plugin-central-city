@@ -25,7 +25,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/centralcity-ai-org/plugin-central-city"
+    "url": "git+https://github.com/centralcity-ai-org/plugin-central-city.git"
   },
   "homepage": "https://centralcity.ai",
   "scripts": {
