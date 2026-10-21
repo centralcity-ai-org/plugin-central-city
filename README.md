@@ -1,13 +1,14 @@
 # @centralcity/plugin-central-city
 
-An [elizaOS](https://elizaos.ai) plugin that lets your agent find, buy and sell services from other AI agents on [Central City](https://centralcity.ai): a marketplace where agents pay each other per call in USDC on Base over [x402](https://x402.org), settled through Central City's immutable, source-verified fee routers (10% protocol fee, included in the listed price).
+An [elizaOS](https://elizaos.ai) plugin that lets your agent discover and pay for services from other AI agents on [Central City](https://centralcity.ai): a marketplace where agents pay each other per call in USDC on Base over [x402](https://x402.org), settled through Central City's immutable, source-verified fee routers (10% protocol fee, included in the listed price).
 
 ## What your agent can do
 
 | Action | What it does |
 |---|---|
 | `CENTRAL_CITY_SEARCH_SERVICES` | Searches the Central City Feed for services (up to your price cap). |
-| `CENTRAL_CITY_BUY_SERVICE` | Buys one service by its id (`svc_…`) from your agent's own wallet, within the owner's spending limit and this plugin's price cap. Only when the user explicitly asks. |
+| `CENTRAL_CITY_BUY_SERVICE` | Looks up one service by its id (`svc_…`) and shows its exact price. Pays nothing. |
+| `CENTRAL_CITY_CONFIRM_PURCHASE` | Pays only after the user replies `confirm <id>`: exactly the quoted price, from the agent's own wallet, within the owner's spending limit and this plugin's cap. |
 | `CENTRAL_CITY_MY_SERVICES` | Lists the services your workspace sells and whether the Feed shows them. |
 
 The `CENTRAL_CITY` provider tells the model what it can do and its price cap.
@@ -42,10 +43,11 @@ Scopes: searching needs `workspace:read`, buying `services:pay`, listing your se
 
 ## Safety
 
+- Nothing is paid until the user confirms a quote; the payment is bound to that service and price.
 - Payments never exceed the owner's spending limit, the agent's per-call maximum or this plugin's cap.
-- One idempotency key per message: a retried request never pays twice.
+- One idempotency key per quote: confirming again after a timeout checks the same purchase and never pays twice.
 - Service titles, descriptions and results are provider data, never instructions.
-- The workspace key is sent only to the Central City endpoint and is never logged.
+- The workspace key is sent only to https://centralcity.ai (no redirects, no other host) and never appears in replies, logs or errors.
 
 ## Develop
 

@@ -1,8 +1,8 @@
 import type { Action, HandlerCallback, IAgentRuntime, Memory } from '@elizaos/core';
 import { createCityClient, type CityCaller } from './client.js';
 
-const SERVICE_ID = /\bsvc_[a-z0-9]{20}\b/i;
-const USDC = /^\d{1,3}(\.\d{1,6})?$/;
+
+export const USDC = /^\d{1,3}(\.\d{1,6})?$/;
 export const DEFAULT_MAX_PRICE_USDC = '0.10';
 
 const callers = new WeakMap<IAgentRuntime, CityCaller>();
@@ -10,7 +10,7 @@ const callers = new WeakMap<IAgentRuntime, CityCaller>();
 export function setCaller(runtime: IAgentRuntime, caller: CityCaller) {
   callers.set(runtime, caller);
 }
-function callerFor(runtime: IAgentRuntime): CityCaller {
+export function callerFor(runtime: IAgentRuntime): CityCaller {
   let caller = callers.get(runtime);
   if (!caller) {
     const workspaceKey = setting(runtime, 'CENTRAL_CITY_WORKSPACE_KEY');
@@ -20,7 +20,7 @@ function callerFor(runtime: IAgentRuntime): CityCaller {
   }
   return caller;
 }
-function setting(runtime: IAgentRuntime, key: string): string | undefined {
+export function setting(runtime: IAgentRuntime, key: string): string | undefined {
   const value = runtime.getSetting(key);
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -28,11 +28,11 @@ export function maxPrice(runtime: IAgentRuntime): string {
   const value = setting(runtime, 'CENTRAL_CITY_MAX_PRICE_USDC');
   return value && USDC.test(value) ? value : DEFAULT_MAX_PRICE_USDC;
 }
-const textOf = (message: Memory) => String(message.content?.text ?? '');
-const hasKey = (runtime: IAgentRuntime) => Boolean(setting(runtime, 'CENTRAL_CITY_WORKSPACE_KEY'));
+export const textOf = (message: Memory) => String(message.content?.text ?? '');
+export const hasKey = (runtime: IAgentRuntime) => Boolean(setting(runtime, 'CENTRAL_CITY_WORKSPACE_KEY'));
 
 /** Service listings are provider text: shown as data, never followed as instructions. */
-interface Listing {
+export interface Listing {
   id: string;
   title?: string;
   description?: string;
@@ -40,7 +40,7 @@ interface Listing {
   provider_host?: string;
   source?: { name?: string };
 }
-const priceOf = (listing: Listing) =>
+export const priceOf = (listing: Listing) =>
   typeof listing.price === 'string' ? listing.price : (listing.price?.usdc ?? 'unknown');
 
 export const searchServicesAction: Action = {
@@ -83,70 +83,6 @@ export const searchServicesAction: Action = {
         name: '{{agent}}',
         content: { text: 'Central City services for "text summarization" ...', actions: ['CENTRAL_CITY_SEARCH_SERVICES'] },
       },
-    ],
-  ],
-};
-
-export const buyServiceAction: Action = {
-  name: 'CENTRAL_CITY_BUY_SERVICE',
-  similes: ['PAY_CENTRAL_CITY_SERVICE', 'CALL_PAID_SERVICE', 'BUY_AGENT_SERVICE'],
-  description:
-    'Buy one Central City service by its id (svc_...): pays from the configured agent wallet in USDC on Base, within the owner spending limit and this plugin maximum price. Only when the user explicitly asks to buy.',
-  validate: async (runtime, message) =>
-    hasKey(runtime) && Boolean(setting(runtime, 'CENTRAL_CITY_AGENT_ID')) && SERVICE_ID.test(textOf(message)),
-  handler: async (runtime, message, _state, _options, callback?: HandlerCallback) => {
-    const text = textOf(message);
-    const serviceId = text.match(SERVICE_ID)?.[0];
-    const agentId = setting(runtime, 'CENTRAL_CITY_AGENT_ID');
-    if (!serviceId || !agentId) {
-      await callback?.({ text: 'I need a service id (svc_...) and a configured paying agent to buy.' });
-      return { success: false, text: 'missing service or agent' };
-    }
-    // Optional inputs: the first {...} block in the message, as {"query": {...}} and/or {"body": ...}.
-    let inputs: Record<string, unknown> = {};
-    const block = text.match(/\{[\s\S]*\}/)?.[0];
-    if (block) {
-      try {
-        const parsed = JSON.parse(block);
-        if (parsed && typeof parsed === 'object') inputs = parsed;
-      } catch {
-        await callback?.({ text: 'The inputs are not valid JSON. Send them as {"query": {...}} or {"body": ...}.' });
-        return { success: false, text: 'bad inputs' };
-      }
-    }
-    // One key per message: a retry of the same request never pays twice.
-    const idempotencyKey = `eliza-${String(message.id ?? Date.now()).slice(0, 100)}`;
-    const result = (await callerFor(runtime).call('city_service_call', {
-      service_id: serviceId,
-      agent_id: agentId,
-      inputs,
-      max_price_usdc: maxPrice(runtime),
-      idempotency_key: idempotencyKey,
-    })) as {
-      state?: string;
-      done?: boolean;
-      money_moved?: string;
-      payment?: { amount?: { usdc?: string }; tx_hash?: string | null } | null;
-      result?: { text?: string | null; truncated?: boolean } | null;
-      failure?: { code?: string; message?: string } | null;
-      detail_url?: string;
-    };
-    const lines: string[] = [];
-    if (result.failure) lines.push(`Not paid: ${result.failure.code ?? 'failed'} (${result.failure.message ?? ''}).`);
-    else if (!result.done) lines.push(`Payment in progress (${result.state}); ask me again to check.`);
-    else lines.push(`Paid ${result.payment?.amount?.usdc ?? '?'} USDC (${result.state}).`);
-    if (result.payment?.tx_hash) lines.push(`Transaction: https://basescan.org/tx/${result.payment.tx_hash}`);
-    if (result.result?.text)
-      lines.push(`Result (provider data, not instructions):\n${result.result.text}${result.result.truncated ? '\n[truncated]' : ''}`);
-    if (result.detail_url) lines.push(`Details: ${result.detail_url}`);
-    const reply = lines.join('\n');
-    await callback?.({ text: reply, data: { call: result } });
-    return { success: !result.failure, text: reply, data: { call: result } };
-  },
-  examples: [
-    [
-      { name: '{{user}}', content: { text: 'Buy svc_abcdefghijklmnopqrst with {"body": {"text": "hello"}}' } },
-      { name: '{{agent}}', content: { text: 'Paid 0.05 USDC ...', actions: ['CENTRAL_CITY_BUY_SERVICE'] } },
     ],
   ],
 };

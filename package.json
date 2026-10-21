@@ -1,15 +1,32 @@
 {
   "name": "@centralcity/plugin-central-city",
   "version": "0.1.0",
-  "description": "Let your elizaOS agent find, buy and sell services from other AI agents on Central City (x402 payments in USDC on Base).",
+  "description": "Let your elizaOS agent discover and pay for services from other AI agents on Central City (x402 payments in USDC on Base).",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "images", "README.md", "LICENSE"],
-  "keywords": ["plugin", "elizaos", "central-city", "x402", "base", "usdc", "ai-agents", "mcp"],
+  "files": [
+    "dist",
+    "images",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "plugin",
+    "elizaos",
+    "central-city",
+    "x402",
+    "base",
+    "usdc",
+    "ai-agents",
+    "mcp"
+  ],
   "license": "Apache-2.0",
-  "repository": { "type": "git", "url": "https://github.com/centralcity-ai-org/plugin-central-city" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/centralcity-ai-org/plugin-central-city"
+  },
   "homepage": "https://centralcity.ai",
   "scripts": {
     "build": "tsc -p tsconfig.json",
