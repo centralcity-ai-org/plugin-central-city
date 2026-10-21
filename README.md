@@ -52,6 +52,8 @@ Scopes: searching needs `workspace:read`, buying `services:pay`, listing your se
 
 ## Limits
 
+- Authentication is a bearer sent to `https://centralcity.ai/mcp`: an AI workspace key (`ccw_…`, does not expire on its own) or an OAuth access token from a person's account. OAuth access tokens expire (typically after 1 hour) and this plugin does not refresh them; for a long-running agent use a workspace key, or refresh the token outside the plugin.
+
 - The one-open-purchase rule is enforced inside one agent process. Several processes sharing the same paying agent need a shared, atomic claim (not included).
 - Open quotes and purchases live in the elizaOS runtime cache: they are as durable as that cache.
 
