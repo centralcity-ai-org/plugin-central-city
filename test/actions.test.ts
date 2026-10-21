@@ -205,3 +205,51 @@ test('my services: lists offers with price and state', async () => {
   answers.city_service_mine = { offers: [{ offer_id: 'off_1', title: 'Hash', price_usdc: '0.05', state: 'active', listed: true }] };
   assert.match((await run(myServicesAction, rt, msg('my services'))).reply, /off_1: Hash \(0\.05 USDC, active, listed\)/);
 });
+
+test('review P1 (round 2): two quotes made before either is confirmed cannot both pay', async () => {
+  const { rt, calls, answers } = runtime(BUYER);
+  answers.city_service_search = listing('0.05');
+  const q1 = quoteIdOf((await run(quoteServiceAction, rt, msg(`buy ${SVC}`))).reply);
+  const q2 = quoteIdOf((await run(quoteServiceAction, rt, msg(`buy ${SVC}`))).reply);
+  answers.city_service_call = () => {
+    throw new Error('timeout');
+  };
+  assert.match((await run(buyServiceAction, rt, msg(`confirm ${SVC} ${q1}`))).reply, /payment state is unknown/);
+  const second = await run(buyServiceAction, rt, msg(`confirm ${SVC} ${q2}`));
+  assert.ok(second.reply.includes(`Another purchase of ${SVC} (quote ${q1}) is still open`), second.reply);
+  const keys = calls.filter((c) => c.tool === 'city_service_call').map((c) => c.args.idempotency_key);
+  assert.deepEqual(keys, [`eliza-${q1}`], 'only q1 was ever sent');
+  answers.city_service_call = SETTLED;
+  assert.equal((await run(buyServiceAction, rt, msg(`confirm ${SVC} ${q1}`))).success, true);
+  assert.equal((await run(buyServiceAction, rt, msg(`confirm ${SVC} ${q2}`))).success, true, 'q2 may pay once q1 is reconciled');
+});
+
+test('review P1 (round 2): concurrent confirmations of two quotes send only one payment', async () => {
+  const { rt, calls, answers } = runtime(BUYER);
+  answers.city_service_search = listing('0.05');
+  const q1 = quoteIdOf((await run(quoteServiceAction, rt, msg(`buy ${SVC}`))).reply);
+  const q2 = quoteIdOf((await run(quoteServiceAction, rt, msg(`buy ${SVC}`))).reply);
+  answers.city_service_call = async () => {
+    await new Promise((r) => setTimeout(r, 20));
+    return { state: 'paying', done: false, money_moved: 'pending', payment: { state: 'sent' } };
+  };
+  const [a, b] = await Promise.all([
+    run(buyServiceAction, rt, msg(`confirm ${SVC} ${q1}`)),
+    run(buyServiceAction, rt, msg(`confirm ${SVC} ${q2}`)),
+  ]);
+  assert.equal(calls.filter((c) => c.tool === 'city_service_call').length, 1);
+  assert.equal([a.reply, b.reply].filter((r) => /still open/.test(r)).length, 1);
+});
+
+test('review P1 (round 2): finishing one purchase does not clear another purchase marker', async () => {
+  const { rt, answers, cache } = runtime(BUYER);
+  answers.city_service_search = listing('0.05');
+  const q1 = quoteIdOf((await run(quoteServiceAction, rt, msg(`buy ${SVC}`))).reply);
+  answers.city_service_call = { state: 'paying', done: false, money_moved: 'pending', payment: { state: 'sent' } };
+  await run(buyServiceAction, rt, msg(`confirm ${SVC} ${q1}`));
+  const pendingKey = [...cache.keys()].find((k) => k.startsWith('central-city:pending:'))!;
+  assert.equal(cache.get(pendingKey), q1);
+  answers.city_service_call = SETTLED;
+  await run(buyServiceAction, rt, msg(`confirm ${SVC} ${q1}`));
+  assert.equal(cache.has(pendingKey), false, 'its own marker is cleared');
+});

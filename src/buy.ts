@@ -28,7 +28,22 @@ interface Quote {
   attemptedAt?: number;
 }
 const quoteKey = (quoteId: string) => `central-city:quote:${quoteId}`;
+/** One open purchase per paying agent, person and service; another quote waits until it is reconciled. */
 const pendingKey = (entityId: string, serviceId: string) => `central-city:pending:${entityId}:${serviceId}`;
+
+/** Serializes claims in this process, so two confirmations cannot both pass the pending check. */
+const locks = new Map<string, Promise<unknown>>();
+async function withLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const before = locks.get(key) ?? Promise.resolve();
+  const run = before.then(work, work);
+  const done = run.catch(() => undefined);
+  locks.set(key, done);
+  try {
+    return await run;
+  } finally {
+    if (locks.get(key) === done) locks.delete(key);
+  }
+}
 
 const toRaw = (usdc: string) => {
   const [whole = '0', frac = ''] = usdc.split('.');
@@ -173,10 +188,24 @@ export const buyServiceAction: Action = {
       if (toRaw(quote.priceUsdc) > toRaw(cap))
         return reply(`The cap is now ${cap} USDC, below the quoted ${quote.priceUsdc} USDC. Nothing was paid.`);
       if (agentId !== quote.agentId) return reply('The paying agent changed since the quote. Ask for a new quote. Nothing was paid.');
-      quote.attemptedAt = Date.now();
-      await runtime.setCache(quoteKey(quoteId), quote);
-      await runtime.setCache(pendingKey(entityId, serviceId), quoteId);
     }
+    // Claim the purchase before any send: another quote of the same person and service is refused
+    // until this one is reconciled (also when both were quoted before either was confirmed).
+    const pKey = pendingKey(entityId, serviceId);
+    const claimed = await withLock(pKey, async () => {
+      const pending = await runtime.getCache<string>(pKey);
+      if (pending && pending !== quoteId) return pending;
+      if (!pending) await runtime.setCache(pKey, quoteId);
+      if (!quote.attemptedAt) {
+        quote.attemptedAt = Date.now();
+        await runtime.setCache(quoteKey(quoteId), quote);
+      }
+      return null;
+    });
+    if (claimed)
+      return reply(
+        `Another purchase of ${serviceId} (quote ${claimed}) is still open. Reply "confirm ${serviceId} ${claimed}" to reconcile it first. Nothing was paid.`,
+      );
     let result: CallAnswer;
     try {
       result = (await callerFor(runtime).call('city_service_call', {
@@ -191,10 +220,12 @@ export const buyServiceAction: Action = {
         `The payment state is unknown. Reply "confirm ${serviceId} ${quoteId}" again to check it: the same confirmation asks about the same purchase (same idempotency key).`,
       );
     }
-    if (result.done) {
-      await runtime.deleteCache(quoteKey(quoteId));
-      await runtime.deleteCache(pendingKey(entityId, serviceId));
-    }
+    if (result.done)
+      await withLock(pKey, async () => {
+        await runtime.deleteCache(quoteKey(quoteId));
+        // Only this purchase's own marker is cleared.
+        if ((await runtime.getCache<string>(pKey)) === quoteId) await runtime.deleteCache(pKey);
+      });
     // Payment and service outcome are reported separately.
     const paid = result.money_moved;
     const lines = [
