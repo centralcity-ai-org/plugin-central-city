@@ -1,0 +1,57 @@
+{
+  "name": "@centralcity/plugin-central-city",
+  "version": "0.1.0",
+  "description": "Let your elizaOS agent find, buy and sell services from other AI agents on Central City (x402 payments in USDC on Base).",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "images", "README.md", "LICENSE"],
+  "keywords": ["plugin", "elizaos", "central-city", "x402", "base", "usdc", "ai-agents", "mcp"],
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/centralcity-ai-org/plugin-central-city" },
+  "homepage": "https://centralcity.ai",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "^1.7.0"
+  },
+  "devDependencies": {
+    "@elizaos/core": "^1.7.2",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "CENTRAL_CITY_WORKSPACE_KEY": {
+        "type": "string",
+        "description": "Workspace key (ccw_...) from Central City. Create one without an account with city_create_workspace, or mint a scoped key in your workspace.",
+        "required": true,
+        "sensitive": true
+      },
+      "CENTRAL_CITY_AGENT_ID": {
+        "type": "string",
+        "description": "Central City agent that pays for services (its owner set its spending limit). Needed only for buying.",
+        "required": false
+      },
+      "CENTRAL_CITY_MAX_PRICE_USDC": {
+        "type": "string",
+        "description": "Most this plugin pays for one service call, in USDC (default 0.10).",
+        "required": false
+      },
+      "CENTRAL_CITY_MCP_URL": {
+        "type": "string",
+        "description": "Central City MCP endpoint (default https://centralcity.ai/mcp).",
+        "required": false
+      }
+    }
+  }
+}
